@@ -2,10 +2,16 @@ name: ChatPlugin
 version: 1.0
 main: com.example.chatplugin.ChatPlugin
 api-version: 1.16
+softdepend: [PlaceholderAPI, Vault] # Added Vault as it's used in placeholders
 commands:
-  localchat: # Optional: command to switch to local chat
-    description: Switches to local chat.
-    usage: /localchat
-  globalchat: # Optional: command to switch to global chat (or use prefix)
-    description: Switches to global chat.
-    usage: /globalchat
+  cpreload:
+    description: Reloads the ChatPlugin configuration.
+    usage: /cpreload
+    permission: chatplugin.reload
+permissions:
+  chatplugin.reload:
+    description: Allows reloading the ChatPlugin configuration.
+    default: op
+  chatplugin.notifyblockedword:
+    description: Notifies user when a player uses a blocked word.
+    default: op

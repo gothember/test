@@ -10,8 +10,30 @@ global-chat:
   # Prefix to send messages to global chat. Example: "!message" for global chat.
   prefix: "!"
 
-# Message format settings (placeholders: %player%, %message%, %prefix%)
-# These are examples, you can customize them further in the code if needed.
+# Message format settings (placeholders: %player%, %message%, %vault_prefix%, %vault_suffix%)
+# Ensure PlaceholderAPI is installed for %vault_...% and other placeholders to work.
 format:
-  local: "&7[Local] <%player%&r&7> %message%"
-  global: "&e[Global] <%player%&r&e> %message%"
+  local: "&7[Local] [%vault_prefix%&r&7%player%&r&7%vault_suffix%&r&7] %message%"
+  global: "&e[Global] [%vault_prefix%&r&e%player%&r&e%vault_suffix%&r&e] %message%"
+
+# Anti-spam settings
+anti-spam:
+  enabled: true
+  message-limit: 3
+  time-period-seconds: 5
+  cooldown-seconds: 10
+  spam-warning-message: "&cPlease don't spam! Wait %cooldown% seconds."
+  cooldown-over-message: "&aYou can chat again."
+
+# Blocked words filter
+blocked-words:
+  enabled: true
+  # List of words to block (case-insensitive)
+  list:
+    - "exampleword1"
+    - "badword2"
+    - "anotherone"
+  # Message sent to the player if they use a blocked word
+  player-warning-message: "&cYou used a blocked word! Please be respectful."
+  # Message sent to admins/staff if a player uses a blocked word (%player% will be replaced)
+  admin-notification-message: "&c[Alert] Player %player% tried to use a blocked word: %word%"
