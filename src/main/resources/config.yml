@@ -1,0 +1,17 @@
+# Configuration for ChatPlugin
+
+# Local chat settings
+local-chat:
+  # Radius in blocks for local messages to be heard
+  radius: 100
+
+# Global chat settings
+global-chat:
+  # Prefix to send messages to global chat. Example: "!message" for global chat.
+  prefix: "!"
+
+# Message format settings (placeholders: %player%, %message%, %prefix%)
+# These are examples, you can customize them further in the code if needed.
+format:
+  local: "&7[Local] <%player%&r&7> %message%"
+  global: "&e[Global] <%player%&r&e> %message%"

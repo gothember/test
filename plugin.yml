@@ -1,0 +1,11 @@
+name: ChatPlugin
+version: 1.0
+main: com.example.chatplugin.ChatPlugin
+api-version: 1.16
+commands:
+  localchat: # Optional: command to switch to local chat
+    description: Switches to local chat.
+    usage: /localchat
+  globalchat: # Optional: command to switch to global chat (or use prefix)
+    description: Switches to global chat.
+    usage: /globalchat
