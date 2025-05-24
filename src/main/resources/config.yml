@@ -2,16 +2,13 @@
 
 # Local chat settings
 local-chat:
-  # Radius in blocks for local messages to be heard
   radius: 100
 
 # Global chat settings
 global-chat:
-  # Prefix to send messages to global chat. Example: "!message" for global chat.
   prefix: "!"
 
-# Message format settings (placeholders: %player%, %message%, %vault_prefix%, %vault_suffix%)
-# Ensure PlaceholderAPI is installed for %vault_...% and other placeholders to work.
+# Message format settings
 format:
   local: "&7[Local] [%vault_prefix%&r&7%player%&r&7%vault_suffix%&r&7] %message%"
   global: "&e[Global] [%vault_prefix%&r&e%player%&r&e%vault_suffix%&r&e] %message%"
@@ -28,12 +25,24 @@ anti-spam:
 # Blocked words filter
 blocked-words:
   enabled: true
-  # List of words to block (case-insensitive)
   list:
     - "exampleword1"
     - "badword2"
-    - "anotherone"
-  # Message sent to the player if they use a blocked word
   player-warning-message: "&cYou used a blocked word! Please be respectful."
-  # Message sent to admins/staff if a player uses a blocked word (%player% will be replaced)
   admin-notification-message: "&c[Alert] Player %player% tried to use a blocked word: %word%"
+
+# Link and IP address filter
+link-ip-filter:
+  enabled: true
+  # Regex for detecting IP addresses. This is a basic example.
+  ip-regex: "(?:[0-9]{1,3}\\.){3}[0-9]{1,3}"
+  # Regex for detecting domain names/links. This is a basic example and might need refinement.
+  link-regex: "([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*\\.)+[a-zA-Z]{2,}(:[0-9]{1,5})?(/[^ \\s]*)?"
+  # List of domains that are allowed and will not be blocked by the link filter.
+  # Example: - "example.com"
+  allowed-domains:
+    - "mycoolserver.com"
+    - "another-allowed-site.net"
+  player-warning-message: "&cPlease do not send links or IP addresses in chat."
+  # %type% will be replaced with "IP address" or "link"
+  admin-notification-message: "&c[Alert] Player %player% tried to send a(n) %type%: %content%"

@@ -1,19 +1,21 @@
 package com.example.chatplugin;
 
-import org.bukkit.ChatColor; // Added for onCommand messages
+import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
-// import org.bukkit.entity.Player; // No longer directly used in this class
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.Bukkit;
 import java.util.List;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
 
 /**
  * Main class for the ChatPlugin.
  * Handles plugin initialization, configuration loading, command registration (reload),
- * PlaceholderAPI integration check, and management of chat features like anti-spam and blocked words.
+ * PlaceholderAPI integration check, and management of chat features like anti-spam, 
+ * blocked words, and IP/link filtering.
  */
 public class ChatPlugin extends JavaPlugin {
 
@@ -33,16 +35,20 @@ public class ChatPlugin extends JavaPlugin {
 
     // Configuration fields for blocked words filter
     private boolean blockedWordsEnabled;
-    private List<String> blockedWordsList; // Stored in lowercase for case-insensitive matching
+    private List<String> blockedWordsList; 
     private String blockedWordsPlayerWarning;
     private String blockedWordsAdminNotification;
 
+    // Configuration fields for Link/IP filter
+    private boolean linkIpFilterEnabled;
+    private Pattern ipPattern;         // Compiled regex for IP detection
+    private Pattern linkPattern;       // Compiled regex for link detection (case-insensitive)
+    private List<String> allowedDomains; // Lowercase list of allowed domains for link filter
+    private String linkIpFilterPlayerWarning;
+    private String linkIpFilterAdminNotification;
+
     private boolean placeholderApiAvailable = false;
 
-    /**
-     * Called when the plugin is enabled.
-     * Sets up configuration, registers listeners, and logs plugin status.
-     */
     @Override
     public void onEnable() {
         setupConfiguration();
@@ -55,26 +61,22 @@ public class ChatPlugin extends JavaPlugin {
      * and logging current settings.
      */
     private void setupConfiguration() {
-        saveDefaultConfig(); // Creates config.yml from resources if it doesn't exist
-        loadConfigValues();  // Loads values from config.yml into plugin fields
-        logStatusMessages(); // Logs the status of loaded configurations
+        saveDefaultConfig(); 
+        loadConfigValues();  
+        logStatusMessages(); 
     }
     
     /**
      * Registers event listeners for the plugin.
-     * Currently registers only the ChatListener.
      */
     private void registerListeners(){
-        // Note: Bukkit's default /reload command re-registers listeners for many plugins.
-        // For our custom /cpreload, ChatListener is designed to fetch live config values via getters,
-        // so re-instantiating or re-registering ChatListener is not strictly necessary for it to pick up changes.
         Bukkit.getPluginManager().registerEvents(new ChatListener(this), this);
         getLogger().info("ChatListener registered.");
     }
 
     /**
-     * Logs the current status of major configurable features to the console.
-     * This includes chat settings, PlaceholderAPI status, anti-spam, and blocked words filter.
+     * Logs the current status of major configurable features to the console,
+     * including chat settings, PlaceholderAPI, anti-spam, blocked words, and link/IP filter.
      */
     private void logStatusMessages() {
         getLogger().info(String.format("Local chat radius set to: %d blocks", localChatRadius));
@@ -88,12 +90,23 @@ public class ChatPlugin extends JavaPlugin {
             getLogger().info(String.format("Anti-spam enabled: %d messages / %d seconds. Cooldown: %d seconds.",
                              antiSpamMessageLimit, antiSpamTimePeriodSeconds, antiSpamCooldownSeconds));
         } else {
-            getLogger().info("Anti-spam is disabled."); // Added else condition for clarity
+             getLogger().info("Anti-spam is disabled.");
         }
         if (blockedWordsEnabled) {
-            getLogger().info(String.format("Blocked words filter enabled. %d words loaded.", blockedWordsList.size()));
+            getLogger().info(String.format("Blocked words filter enabled. %d words loaded.", 
+                             (blockedWordsList != null ? blockedWordsList.size() : 0)));
         } else {
-            getLogger().info("Blocked words filter is disabled.");
+            getLogger().info("Blocked words filter disabled.");
+        }
+        if (linkIpFilterEnabled) {
+            getLogger().info("Link/IP filter enabled.");
+            if (allowedDomains != null && !allowedDomains.isEmpty()) {
+                getLogger().info(String.format("Allowed domains for link filter: %s", String.join(", ", allowedDomains)));
+            } else {
+                getLogger().info("No domains explicitly allowed for link filter (all links will be blocked unless regex is very specific or filter disabled).");
+            }
+        } else {
+            getLogger().info("Link/IP filter disabled.");
         }
     }
 
@@ -104,8 +117,8 @@ public class ChatPlugin extends JavaPlugin {
 
     /**
      * Loads or reloads configuration settings from the config.yml file into the plugin's fields.
-     * This method is called on plugin startup and by the reload command.
-     * It ensures that all configurable aspects of the plugin are updated with the latest values.
+     * This includes chat settings, anti-spam, blocked words, and the link/IP filter.
+     * Regex patterns are compiled here, and lists are processed (e.g., to lowercase).
      */
     public void loadConfigValues() {
         FileConfiguration config = getConfig();
@@ -123,62 +136,60 @@ public class ChatPlugin extends JavaPlugin {
         antiSpamCooldownSeconds = config.getInt("anti-spam.cooldown-seconds", 10);
         antiSpamWarningMessage = config.getString("anti-spam.spam-warning-message", "&cPlease don't spam! Wait %cooldown% seconds.");
         antiSpamCooldownOverMessage = config.getString("anti-spam.cooldown-over-message", "&aYou can chat again.");
-
+        
         // Blocked words filter settings
         blockedWordsEnabled = config.getBoolean("blocked-words.enabled", true);
-        // Load the list of blocked words and convert them to lowercase for efficient, case-insensitive matching.
         blockedWordsList = config.getStringList("blocked-words.list").stream()
-                                .map(String::toLowerCase) 
+                                .map(String::toLowerCase)
                                 .collect(Collectors.toList());
         blockedWordsPlayerWarning = config.getString("blocked-words.player-warning-message", "&cYou used a blocked word! Please be respectful.");
         blockedWordsAdminNotification = config.getString("blocked-words.admin-notification-message", "&c[Alert] Player %player% tried to use a blocked word: %word%");
+
+        // Load Link/IP filter settings
+        linkIpFilterEnabled = config.getBoolean("link-ip-filter.enabled", true);
+        try {
+            ipPattern = Pattern.compile(config.getString("link-ip-filter.ip-regex", "(?:[0-9]{1,3}\\.){3}[0-9]{1,3}"));
+            linkPattern = Pattern.compile(config.getString("link-ip-filter.link-regex", "([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*\\.)+[a-zA-Z]{2,}(:[0-9]{1,5})?(/[^ \\s]*)?"), Pattern.CASE_INSENSITIVE);
+        } catch (PatternSyntaxException e) {
+            getLogger().severe("Failed to compile IP/Link regex patterns from config: " + e.getMessage());
+            ipPattern = Pattern.compile("(?:[0-9]{1,3}\\.){3}[0-9]{1,3}"); 
+            linkPattern = Pattern.compile("([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*\\.)+[a-zA-Z]{2,}(:[0-9]{1,5})?(/[^ \\s]*)?", Pattern.CASE_INSENSITIVE);
+            linkIpFilterEnabled = false; 
+            getLogger().warning("Link/IP filter has been disabled due to invalid regex in config. Please check your regex patterns.");
+        }
+        allowedDomains = config.getStringList("link-ip-filter.allowed-domains").stream()
+                                .map(String::toLowerCase) 
+                                .collect(Collectors.toList());
+        linkIpFilterPlayerWarning = config.getString("link-ip-filter.player-warning-message", "&cPlease do not send links or IP addresses in chat.");
+        linkIpFilterAdminNotification = config.getString("link-ip-filter.admin-notification-message", "&c[Alert] Player %player% tried to send a(n) %type%: %content%");
         
-        // PlaceholderAPI check
         placeholderApiAvailable = Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null;
     }
 
-    /**
-     * Handles plugin commands.
-     * Currently supports `/cpreload` for reloading the plugin's configuration from disk.
-     * @param sender The entity who sent the command (e.g., Player or ConsoleCommandSender).
-     * @param command The command that was executed.
-     * @param label The alias of the command used.
-     * @param args The arguments passed with the command.
-     * @return true if the command was handled by this plugin, false otherwise.
-     */
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (command.getName().equalsIgnoreCase("cpreload")) {
-            // Check if the sender has the required permission to reload the configuration.
             if (!sender.hasPermission("chatplugin.reload")) {
                 sender.sendMessage(ChatColor.RED + "You do not have permission to use this command.");
-                return true; // Command handled (permission denied)
+                return true;
             }
-            
-            // Perform the reload operations:
-            // 1. reloadConfig(): Bukkit's method to reload the config.yml from disk.
             this.reloadConfig();      
-            // 2. loadConfigValues(): Custom method to load the new values from the config into plugin fields.
             this.loadConfigValues();  
-            
-            // ChatListener uses getters, so it will automatically use new config values.
-            // No need to re-register or re-initialize ChatListener for config changes.
-
             sender.sendMessage(ChatColor.GREEN + "ChatPlugin configuration has been reloaded.");
             getLogger().info("Configuration reloaded by " + sender.getName() + ".");
-            logStatusMessages(); // Log the new status of configurations to console for verification.
-            return true; // Command handled successfully
+            logStatusMessages();
+            return true;
         }
-        return false; // Command not recognized or handled by this plugin
+        return false;
     }
 
-    // Getter methods for chat settings
+    // Getters for chat settings
     public int getLocalChatRadius() { return localChatRadius; }
     public String getGlobalChatPrefix() { return globalChatPrefix; }
     public String getLocalChatFormat() { return localChatFormat; }
     public String getGlobalChatFormat() { return globalChatFormat; }
 
-    // Getter methods for anti-spam settings
+    // Getters for anti-spam settings
     public boolean isAntiSpamEnabled() { return antiSpamEnabled; }
     public int getAntiSpamMessageLimit() { return antiSpamMessageLimit; }
     public int getAntiSpamTimePeriodSeconds() { return antiSpamTimePeriodSeconds; }
@@ -186,16 +197,26 @@ public class ChatPlugin extends JavaPlugin {
     public String getAntiSpamWarningMessage() { return antiSpamWarningMessage; }
     public String getAntiSpamCooldownOverMessage() { return antiSpamCooldownOverMessage; }
 
-    // Getter methods for blocked words filter settings
-    /** @return True if the blocked words filter is enabled, false otherwise. */
+    // Getters for blocked words filter settings
     public boolean isBlockedWordsEnabled() { return blockedWordsEnabled; }
-    /** @return The list of configured blocked words (all in lowercase). */
     public List<String> getBlockedWordsList() { return blockedWordsList; }
-    /** @return The warning message template for players who use a blocked word. */
     public String getBlockedWordsPlayerWarning() { return blockedWordsPlayerWarning; }
-    /** @return The notification message template for staff when a blocked word is used. */
     public String getBlockedWordsAdminNotification() { return blockedWordsAdminNotification; }
 
-    // Getter for PlaceholderAPI status
+    // Getters for Link/IP filter settings
+    /** @return True if the Link/IP address filter is enabled in the config. */
+    public boolean isLinkIpFilterEnabled() { return linkIpFilterEnabled; }
+    /** @return Compiled regex Pattern for detecting IP addresses. */
+    public Pattern getIpPattern() { return ipPattern; }
+    /** @return Compiled regex Pattern for detecting links (case-insensitive). */
+    public Pattern getLinkPattern() { return linkPattern; }
+    /** @return List of lowercase domain names that are exempt from the link filter. */
+    public List<String> getAllowedDomains() { return allowedDomains; }
+    /** @return The warning message for players attempting to send a link or IP address. */
+    public String getLinkIpFilterPlayerWarning() { return linkIpFilterPlayerWarning; }
+    /** @return The notification message format for admins when a link or IP is detected. */
+    public String getLinkIpFilterAdminNotification() { return linkIpFilterAdminNotification; }
+
+    /** @return True if PlaceholderAPI is available on the server. */
     public boolean isPlaceholderApiAvailable() { return placeholderApiAvailable; }
 }

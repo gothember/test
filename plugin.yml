@@ -2,7 +2,7 @@ name: ChatPlugin
 version: 1.0
 main: com.example.chatplugin.ChatPlugin
 api-version: 1.16
-softdepend: [PlaceholderAPI, Vault] # Added Vault as it's used in placeholders
+softdepend: [PlaceholderAPI, Vault]
 commands:
   cpreload:
     description: Reloads the ChatPlugin configuration.
@@ -13,5 +13,20 @@ permissions:
     description: Allows reloading the ChatPlugin configuration.
     default: op
   chatplugin.notifyblockedword:
-    description: Notifies user when a player uses a blocked word.
+    description: Notifies staff when a player uses a blocked word or sends a link/IP. # Updated description
+    default: op
+  chatplugin.globalchat: # New permission
+    description: Allows using the global chat prefix to send messages to everyone.
+    default: true 
+  chatplugin.localchat: # New permission
+    description: Allows using local chat.
+    default: true
+  chatplugin.bypass.antispam: # New permission
+    description: Allows bypassing the anti-spam filter.
+    default: op
+  chatplugin.bypass.blockedwords: # New permission
+    description: Allows bypassing the blocked words filter.
+    default: op
+  chatplugin.bypass.iplinkcheck: # New permission
+    description: Allows bypassing the IP address and link filter.
     default: op
