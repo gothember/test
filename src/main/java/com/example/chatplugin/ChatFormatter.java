@@ -41,7 +41,7 @@ public class ChatFormatter {
         // Iterate through all occurrences of the HEX pattern in the message.
         while (matcher.find()) {
             // matcher.group(1) captures the six hexadecimal characters (the RRGGBB part).
-            String hexCode = matcher.group(1); 
+            String hexCode = matcher.group(1);
             try {
                 // ChatColor.of("#" + hexCode) converts the HEX string (e.g., "#FF00AA")
                 // into its corresponding ChatColor object. This requires a server version
@@ -52,15 +52,15 @@ public class ChatFormatter {
                 // If ChatColor.of() fails (e.g., invalid HEX, or server version doesn't support it),
                 // catch the exception to prevent plugin errors.
                 // Log a warning to the console. Using System.err as a simple logger here.
-                System.err.println("[ChatPlugin] Failed to parse HEX color: &#" + hexCode + 
+                System.err.println("[ChatPlugin] Failed to parse HEX color: &#" + hexCode +
                                    ". Ensure you are using Paper/Spigot 1.16+ and the code is valid.");
                 // Append the original matched string (e.g., "&#FF00AA") so it's not lost from the message.
-                matcher.appendReplacement(sb, matcher.group(0)); 
+                matcher.appendReplacement(sb, matcher.group(0));
             }
         }
         // After all replacements, append any remaining part of the input string to the StringBuffer.
         matcher.appendTail(sb);
-        
+
         // Return the fully processed string from the StringBuffer.
         return sb.toString();
     }

@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
 /**
  * Main class for the ChatPlugin.
  * Handles plugin initialization, configuration loading, command registration (reload),
- * PlaceholderAPI integration check, and management of chat features like anti-spam, 
+ * PlaceholderAPI integration check, and management of chat features like anti-spam,
  * blocked words, and IP/link filtering.
  */
 public class ChatPlugin extends JavaPlugin {
@@ -35,7 +35,7 @@ public class ChatPlugin extends JavaPlugin {
 
     // Configuration fields for blocked words filter
     private boolean blockedWordsEnabled;
-    private List<String> blockedWordsList; 
+    private List<String> blockedWordsList;
     private String blockedWordsPlayerWarning;
     private String blockedWordsAdminNotification;
 
@@ -61,11 +61,11 @@ public class ChatPlugin extends JavaPlugin {
      * and logging current settings.
      */
     private void setupConfiguration() {
-        saveDefaultConfig(); 
-        loadConfigValues();  
-        logStatusMessages(); 
+        saveDefaultConfig();
+        loadConfigValues();
+        logStatusMessages();
     }
-    
+
     /**
      * Registers event listeners for the plugin.
      */
@@ -93,7 +93,7 @@ public class ChatPlugin extends JavaPlugin {
              getLogger().info("Anti-spam is disabled.");
         }
         if (blockedWordsEnabled) {
-            getLogger().info(String.format("Blocked words filter enabled. %d words loaded.", 
+            getLogger().info(String.format("Blocked words filter enabled. %d words loaded.",
                              (blockedWordsList != null ? blockedWordsList.size() : 0)));
         } else {
             getLogger().info("Blocked words filter disabled.");
@@ -136,7 +136,7 @@ public class ChatPlugin extends JavaPlugin {
         antiSpamCooldownSeconds = config.getInt("anti-spam.cooldown-seconds", 10);
         antiSpamWarningMessage = config.getString("anti-spam.spam-warning-message", "&cPlease don't spam! Wait %cooldown% seconds.");
         antiSpamCooldownOverMessage = config.getString("anti-spam.cooldown-over-message", "&aYou can chat again.");
-        
+
         // Blocked words filter settings
         blockedWordsEnabled = config.getBoolean("blocked-words.enabled", true);
         blockedWordsList = config.getStringList("blocked-words.list").stream()
@@ -152,17 +152,17 @@ public class ChatPlugin extends JavaPlugin {
             linkPattern = Pattern.compile(config.getString("link-ip-filter.link-regex", "([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*\\.)+[a-zA-Z]{2,}(:[0-9]{1,5})?(/[^ \\s]*)?"), Pattern.CASE_INSENSITIVE);
         } catch (PatternSyntaxException e) {
             getLogger().severe("Failed to compile IP/Link regex patterns from config: " + e.getMessage());
-            ipPattern = Pattern.compile("(?:[0-9]{1,3}\\.){3}[0-9]{1,3}"); 
+            ipPattern = Pattern.compile("(?:[0-9]{1,3}\\.){3}[0-9]{1,3}");
             linkPattern = Pattern.compile("([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*\\.)+[a-zA-Z]{2,}(:[0-9]{1,5})?(/[^ \\s]*)?", Pattern.CASE_INSENSITIVE);
-            linkIpFilterEnabled = false; 
+            linkIpFilterEnabled = false;
             getLogger().warning("Link/IP filter has been disabled due to invalid regex in config. Please check your regex patterns.");
         }
         allowedDomains = config.getStringList("link-ip-filter.allowed-domains").stream()
-                                .map(String::toLowerCase) 
+                                .map(String::toLowerCase)
                                 .collect(Collectors.toList());
         linkIpFilterPlayerWarning = config.getString("link-ip-filter.player-warning-message", "&cPlease do not send links or IP addresses in chat.");
         linkIpFilterAdminNotification = config.getString("link-ip-filter.admin-notification-message", "&c[Alert] Player %player% tried to send a(n) %type%: %content%");
-        
+
         placeholderApiAvailable = Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null;
     }
 
@@ -173,8 +173,8 @@ public class ChatPlugin extends JavaPlugin {
                 sender.sendMessage(ChatColor.RED + "You do not have permission to use this command.");
                 return true;
             }
-            this.reloadConfig();      
-            this.loadConfigValues();  
+            this.reloadConfig();
+            this.loadConfigValues();
             sender.sendMessage(ChatColor.GREEN + "ChatPlugin configuration has been reloaded.");
             getLogger().info("Configuration reloaded by " + sender.getName() + ".");
             logStatusMessages();

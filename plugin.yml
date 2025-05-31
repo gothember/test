@@ -17,7 +17,7 @@ permissions:
     default: op
   chatplugin.globalchat: # New permission
     description: Allows using the global chat prefix to send messages to everyone.
-    default: true 
+    default: true
   chatplugin.localchat: # New permission
     description: Allows using local chat.
     default: true

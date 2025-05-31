@@ -39,7 +39,7 @@ public class ChatListener implements Listener {
 
     /**
      * Handles player chat messages at HIGH priority.
-     * ignoreCancelled = false means it respects cancellations from plugins at NORMAL or lower priorities 
+     * ignoreCancelled = false means it respects cancellations from plugins at NORMAL or lower priorities
      * if they also use ignoreCancelled = false. Our own filters will cancel the event if triggered.
      * @param event The AsyncPlayerChatEvent.
      */
@@ -56,8 +56,8 @@ public class ChatListener implements Listener {
             for (String blockedWord : plugin.getBlockedWordsList()) { // List is already lowercase
                 if (lowerCaseMessage.contains(blockedWord)) {
                     // Calls helper to cancel event, warn player, and notify staff
-                    handleBlockedContent(event, sender, "blocked word", blockedWord, 
-                                           plugin.getBlockedWordsPlayerWarning(), 
+                    handleBlockedContent(event, sender, "blocked word", blockedWord,
+                                           plugin.getBlockedWordsPlayerWarning(),
                                            plugin.getBlockedWordsAdminNotification().replace("%word%", blockedWord));
                     return; // Message blocked, stop further processing by this listener
                 }
@@ -73,8 +73,8 @@ public class ChatListener implements Listener {
             if (ipMatcher.find()) {
                 String detectedIp = ipMatcher.group(0); // The matched IP address
                 // Calls helper to handle consequences
-                handleBlockedContent(event, sender, "IP address", detectedIp, 
-                                       plugin.getLinkIpFilterPlayerWarning(), 
+                handleBlockedContent(event, sender, "IP address", detectedIp,
+                                       plugin.getLinkIpFilterPlayerWarning(),
                                        plugin.getLinkIpFilterAdminNotification().replace("%type%", "IP address").replace("%content%", detectedIp));
                 return; // Message blocked, stop further processing
             }
@@ -95,8 +95,8 @@ public class ChatListener implements Listener {
                 if (!isAllowed) {
                     // Link is not in the allowed list, so block it.
                     // Calls helper to handle consequences
-                    handleBlockedContent(event, sender, "link", detectedLink, 
-                                           plugin.getLinkIpFilterPlayerWarning(), 
+                    handleBlockedContent(event, sender, "link", detectedLink,
+                                           plugin.getLinkIpFilterPlayerWarning(),
                                            plugin.getLinkIpFilterAdminNotification().replace("%type%", "link").replace("%content%", detectedLink));
                     return; // Message blocked, stop further processing
                 }
@@ -152,7 +152,7 @@ public class ChatListener implements Listener {
         // --- Chat Type Permissions & Formatting ---
         // If the message passed all filters (or bypasses were used), proceed.
         // Cancel original event as we are handling chat formatting and sending manually.
-        event.setCancelled(true); 
+        event.setCancelled(true);
 
         String messageContent;
         String chatFormat;
@@ -207,11 +207,11 @@ public class ChatListener implements Listener {
             double localRadiusSquared = localRadius * localRadius;
             for (Player recipient : Bukkit.getOnlinePlayers()) {
                 if (recipient.getWorld().equals(sender.getWorld())) {
-                    if (sender.equals(recipient)) { 
+                    if (sender.equals(recipient)) {
                         recipient.sendMessage(finalMessage);
                         continue;
                     }
-                    if (recipient.getLocation().distanceSquared(sender.getLocation()) <= localRadiusSquared) { 
+                    if (recipient.getLocation().distanceSquared(sender.getLocation()) <= localRadiusSquared) {
                         recipient.sendMessage(finalMessage);
                     }
                 }
@@ -221,14 +221,14 @@ public class ChatListener implements Listener {
 
     /**
      * Helper method to handle actions when a message is blocked by a filter (words, IP, link).
-     * This method centralizes the logic for cancelling the event, warning the player, 
+     * This method centralizes the logic for cancelling the event, warning the player,
      * and notifying staff members who have the appropriate permission.
      * @param event The AsyncPlayerChatEvent that is being processed.
      * @param sender The player who sent the potentially offending message.
      * @param type A string describing the type of content blocked (e.g., "blocked word", "IP address", "link").
      * @param content The actual blocked content/text that triggered the filter.
      * @param playerWarning The warning message to be sent to the player (already formatted or raw).
-     * @param adminNotificationFormat The format string for the notification to admins. 
+     * @param adminNotificationFormat The format string for the notification to admins.
      *        This string should already have specific placeholders like %word% or %type%/%content% filled by the caller.
      *        It may still contain %player% which will be replaced here.
      */
@@ -248,19 +248,19 @@ public class ChatListener implements Listener {
             if (adminNotification.contains("%player%")) {
                  adminNotification = adminNotification.replace("%player%", sender.getName());
             }
-            
+
             // Ensure the final admin notification is color-formatted.
             final String finalAdminNotification = ChatFormatter.formatMessage(adminNotification);
 
             // Send to online players who have the "chatplugin.notifyblockedword" permission.
             // This single permission is used for all filter notifications for simplicity.
             Bukkit.getOnlinePlayers().forEach(onlinePlayer -> {
-                if (onlinePlayer.hasPermission("chatplugin.notifyblockedword")) { 
+                if (onlinePlayer.hasPermission("chatplugin.notifyblockedword")) {
                     onlinePlayer.sendMessage(finalAdminNotification);
                 }
             });
             // Log the notification to the server console for record-keeping.
-            plugin.getLogger().info(finalAdminNotification); 
+            plugin.getLogger().info(finalAdminNotification);
         }
     }
 }
