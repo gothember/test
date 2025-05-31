@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
  * - IP Address / Link filter (with bypass permission and allowed domains).
  * - Anti-spam mechanism (with bypass permission).
  * - Chat type (Global/Local) permission checks.
- * - Player mentions (highlighting names with prefix, color, and appending a reset color).
+ * - Player mentions (highlighting names with prefix, color, and appending a configurable color after mention).
  * - PlaceholderAPI integration for dynamic content.
  * - Message formatting using ChatFormatter.
  */
@@ -134,31 +134,29 @@ public class ChatListener implements Listener {
 
         // --- Player Mentions Processing ---
         // This section modifies `messageContent` to highlight player names.
-        // It iterates through online players, checks if their name is mentioned (case-insensitively, as a whole word),
-        // applies configured coloring and prefix (avoiding double prefixes), and appends a reset color code.
+        // It uses configured prefix, color, and a configurable color code to apply after the mention.
         if (plugin.isPlayerMentionsEnabled()) {
             String mentionPrefix = plugin.getPlayerMentionsPrefix();
             String mentionHexColor = plugin.getPlayerMentionsHexColor();
-            String resetColor = "&r"; // Standard Minecraft reset color code to prevent color bleeding.
+            // Get the configured color code to append after the mention (e.g., "&r" for reset).
+            String colorAfterMention = plugin.getPlayerMentionsColorAfterMention();
 
-            List<Player> onlinePlayers = new LinkedList<>(Bukkit.getOnlinePlayers()); // Iterate over a copy.
-            String currentMessageIteration = messageContent; // This string is modified in each player's iteration.
+            List<Player> onlinePlayers = new LinkedList<>(Bukkit.getOnlinePlayers());
+            String currentMessageIteration = messageContent;
 
             for (Player mentionedPlayer : onlinePlayers) {
-                if (mentionedPlayer.equals(sender)) continue; // Players cannot mention themselves.
+                if (mentionedPlayer.equals(sender)) continue;
 
                 String playerName = mentionedPlayer.getName();
-                // Regex to find the player's name (case-insensitive, whole word).
                 Pattern namePattern = Pattern.compile("\\b\\Q" + playerName + "\\E\\b", Pattern.CASE_INSENSITIVE);
                 Matcher nameMatcher = namePattern.matcher(currentMessageIteration);
-                StringBuffer sb = new StringBuffer(); // Used to build the new message content for this iteration.
+                StringBuffer sb = new StringBuffer();
 
                 while (nameMatcher.find()) {
-                    String actualFoundName = nameMatcher.group(0); // The exact name string matched.
+                    String actualFoundName = nameMatcher.group(0);
                     boolean prefixAlreadyPresent = false;
                     int matchStart = nameMatcher.start();
 
-                    // Check if the configured prefix is immediately before the found name.
                     if (!mentionPrefix.isEmpty() && matchStart >= mentionPrefix.length()) {
                         if (currentMessageIteration.substring(matchStart - mentionPrefix.length(), matchStart).equals(mentionPrefix)) {
                             prefixAlreadyPresent = true;
@@ -167,26 +165,21 @@ public class ChatListener implements Listener {
 
                     String replacement;
                     if (prefixAlreadyPresent) {
-                        // Prefix is already typed by the sender (e.g., "@PlayerName").
-                        // Color the existing prefix and name, then append the reset color code.
-                        // The substring `currentMessageIteration.substring(...)` ensures original casing of prefix is kept.
-                        replacement = mentionHexColor + currentMessageIteration.substring(matchStart - mentionPrefix.length(), matchStart) + actualFoundName + resetColor;
+                        // Append the configured color that should follow the mention.
+                        replacement = mentionHexColor + currentMessageIteration.substring(matchStart - mentionPrefix.length(), matchStart) + actualFoundName + colorAfterMention;
                     } else {
-                        // Prefix is not typed by the sender (e.g., "PlayerName").
-                        // Add the configured prefix, color the prefix and name, then append the reset color code.
-                        replacement = mentionHexColor + mentionPrefix + actualFoundName + resetColor;
+                        // Append the configured color that should follow the mention.
+                        replacement = mentionHexColor + mentionPrefix + actualFoundName + colorAfterMention;
                     }
-                    // Append the processed mention and the preceding text.
                     nameMatcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
                 }
-                nameMatcher.appendTail(sb); // Append the rest of the message after the last match.
-                currentMessageIteration = sb.toString(); // Update message for the next player/mention iteration.
+                nameMatcher.appendTail(sb);
+                currentMessageIteration = sb.toString();
             }
-            messageContent = currentMessageIteration; // Final content after all mentions have been processed.
+            messageContent = currentMessageIteration;
         }
 
         // --- Chat Type Permissions & Final Formatting ---
-        // ... (rest of the method remains the same) ...
         event.setCancelled(true);
 
         String finalOutputMessage;

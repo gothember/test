@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
  * Main class for the ChatPlugin.
  * Handles plugin initialization, configuration loading, command registration (reload),
  * PlaceholderAPI integration check, and management of chat features like anti-spam,
- * blocked words, IP/link filtering, and player mentions.
+ * blocked words, IP/link filtering, and player mentions including configurable color after mention.
  */
 public class ChatPlugin extends JavaPlugin {
 
@@ -48,10 +48,11 @@ public class ChatPlugin extends JavaPlugin {
     private String linkIpFilterAdminNotification;
 
     // Configuration fields for Player Mentions
-    private boolean playerMentionsEnabled;      // True if player mentions are enabled
-    private String playerMentionsPrefix;        // Prefix for mentions, e.g., "@"
-    private String playerMentionsHexColor;      // HEX color for mentioned names, e.g., "&#FFD700"
-    private boolean playerMentionsRequireOnline; // If true, only online players are highlighted
+    private boolean playerMentionsEnabled;
+    private String playerMentionsPrefix;
+    private String playerMentionsHexColor;
+    private boolean playerMentionsRequireOnline;
+    private String playerMentionsColorAfterMention; // New field for color after mention
 
     private boolean placeholderApiAvailable = false;
 
@@ -82,7 +83,7 @@ public class ChatPlugin extends JavaPlugin {
 
     /**
      * Logs the current status of major configurable features to the console,
-     * including chat settings, PlaceholderAPI, anti-spam, blocked words, link/IP filter, and player mentions.
+     * including player mentions and the color applied after a mention.
      */
     private void logStatusMessages() {
         getLogger().info(String.format("Local chat radius set to: %d blocks", localChatRadius));
@@ -114,10 +115,9 @@ public class ChatPlugin extends JavaPlugin {
         } else {
             getLogger().info("Link/IP filter disabled.");
         }
-        // Logging for Player Mentions
         if (playerMentionsEnabled) {
-            getLogger().info(String.format("Player Mentions enabled. Prefix: '%s', Color: '%s', Require Online: %b",
-                             playerMentionsPrefix, playerMentionsHexColor, playerMentionsRequireOnline));
+            getLogger().info(String.format("Player Mentions enabled. Prefix: '%s', Color: '%s', Require Online: %b, Color After Mention: '%s'",
+                             playerMentionsPrefix, playerMentionsHexColor, playerMentionsRequireOnline, playerMentionsColorAfterMention));
         } else {
             getLogger().info("Player Mentions disabled.");
         }
@@ -130,18 +130,16 @@ public class ChatPlugin extends JavaPlugin {
 
     /**
      * Loads or reloads configuration settings from the config.yml file into the plugin's fields.
-     * This includes chat settings, anti-spam, blocked words, link/IP filter, and player mentions.
+     * This includes all chat features, anti-spam, filters, and player mention settings.
      */
     public void loadConfigValues() {
         FileConfiguration config = getConfig();
 
-        // Chat settings
         localChatRadius = config.getInt("local-chat.radius", 100);
         globalChatPrefix = config.getString("global-chat.prefix", "!");
         localChatFormat = config.getString("format.local", "&7[Local] [%vault_prefix%&r&7%player%&r&7%vault_suffix%&r&7] %message%");
         globalChatFormat = config.getString("format.global", "&e[Global] [%vault_prefix%&r&e%player%&r&e%vault_suffix%&r&e] %message%");
 
-        // Anti-spam settings
         antiSpamEnabled = config.getBoolean("anti-spam.enabled", true);
         antiSpamMessageLimit = config.getInt("anti-spam.message-limit", 3);
         antiSpamTimePeriodSeconds = config.getInt("anti-spam.time-period-seconds", 5);
@@ -149,7 +147,6 @@ public class ChatPlugin extends JavaPlugin {
         antiSpamWarningMessage = config.getString("anti-spam.spam-warning-message", "&cPlease don't spam! Wait %cooldown% seconds.");
         antiSpamCooldownOverMessage = config.getString("anti-spam.cooldown-over-message", "&aYou can chat again.");
 
-        // Blocked words filter settings
         blockedWordsEnabled = config.getBoolean("blocked-words.enabled", true);
         blockedWordsList = config.getStringList("blocked-words.list").stream()
                                 .map(String::toLowerCase)
@@ -157,7 +154,6 @@ public class ChatPlugin extends JavaPlugin {
         blockedWordsPlayerWarning = config.getString("blocked-words.player-warning-message", "&cYou used a blocked word! Please be respectful.");
         blockedWordsAdminNotification = config.getString("blocked-words.admin-notification-message", "&c[Alert] Player %player% tried to use a blocked word: %word%");
 
-        // Load Link/IP filter settings
         linkIpFilterEnabled = config.getBoolean("link-ip-filter.enabled", true);
         try {
             ipPattern = Pattern.compile(config.getString("link-ip-filter.ip-regex", "(?:[0-9]{1,3}\\.){3}[0-9]{1,3}"));
@@ -178,8 +174,9 @@ public class ChatPlugin extends JavaPlugin {
         // Load Player Mention settings
         playerMentionsEnabled = config.getBoolean("player-mentions.enabled", true);
         playerMentionsPrefix = config.getString("player-mentions.mention-prefix", "@");
-        playerMentionsHexColor = config.getString("player-mentions.mention-hex-color", "&#DAA520"); // Default to a gold-like color
+        playerMentionsHexColor = config.getString("player-mentions.mention-hex-color", "&#DAA520");
         playerMentionsRequireOnline = config.getBoolean("player-mentions.require-player-online", true);
+        playerMentionsColorAfterMention = config.getString("player-mentions.color-after-mention", "&r"); // Load new setting
 
         placeholderApiAvailable = Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null;
     }
@@ -230,15 +227,12 @@ public class ChatPlugin extends JavaPlugin {
     public String getLinkIpFilterAdminNotification() { return linkIpFilterAdminNotification; }
 
     // Getters for Player Mention settings
-    /** @return True if player mentions are enabled in the config. */
     public boolean isPlayerMentionsEnabled() { return playerMentionsEnabled; }
-    /** @return The configured prefix string for player mentions (e.g., "@"). */
     public String getPlayerMentionsPrefix() { return playerMentionsPrefix; }
-    /** @return The configured HEX color string for highlighting player mentions (e.g., "&#DAA520"). */
     public String getPlayerMentionsHexColor() { return playerMentionsHexColor; }
-    /** @return True if mentioned players must be online for the mention to be formatted, false otherwise. */
-    public boolean getPlayerMentionsRequireOnline() { return playerMentionsRequireOnline; } // Corrected getter name
+    public boolean getPlayerMentionsRequireOnline() { return playerMentionsRequireOnline; }
+    /** @return The configured color code to apply after a player mention (e.g., "&r" for reset). */
+    public String getPlayerMentionsColorAfterMention() { return playerMentionsColorAfterMention; } // New getter
 
-    /** @return True if PlaceholderAPI is available on the server. */
     public boolean isPlaceholderApiAvailable() { return placeholderApiAvailable; }
 }

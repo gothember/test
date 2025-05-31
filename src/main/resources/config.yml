@@ -45,10 +45,9 @@ link-ip-filter:
 # Player Mention settings
 player-mentions:
   enabled: true
-  # The prefix to add before a mentioned player's name (e.g., @PlayerName)
   mention-prefix: "@"
-  # The HEX color to apply to the mentioned player's name and prefix (e.g., "&#FFD700" for gold)
-  # Ensure this is a valid HEX color format that ChatFormatter can parse.
   mention-hex-color: "&#DAA520" # Example: Luminous Vivid Amber
-  # If true, only add prefix/color if player is online. If false, always try to format known player names.
   require-player-online: true
+  # Color code to apply to text immediately following a player mention.
+  # Use "&r" for reset (default Minecraft behavior), or any other color code like "&f" for white, "&7" for gray, etc.
+  color-after-mention: "&r"
