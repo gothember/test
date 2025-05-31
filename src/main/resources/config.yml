@@ -34,15 +34,21 @@ blocked-words:
 # Link and IP address filter
 link-ip-filter:
   enabled: true
-  # Regex for detecting IP addresses. This is a basic example.
   ip-regex: "(?:[0-9]{1,3}\\.){3}[0-9]{1,3}"
-  # Regex for detecting domain names/links. This is a basic example and might need refinement.
   link-regex: "([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*\\.)+[a-zA-Z]{2,}(:[0-9]{1,5})?(/[^ \\s]*)?"
-  # List of domains that are allowed and will not be blocked by the link filter.
-  # Example: - "example.com"
   allowed-domains:
     - "mycoolserver.com"
     - "another-allowed-site.net"
   player-warning-message: "&cPlease do not send links or IP addresses in chat."
-  # %type% will be replaced with "IP address" or "link"
   admin-notification-message: "&c[Alert] Player %player% tried to send a(n) %type%: %content%"
+
+# Player Mention settings
+player-mentions:
+  enabled: true
+  # The prefix to add before a mentioned player's name (e.g., @PlayerName)
+  mention-prefix: "@"
+  # The HEX color to apply to the mentioned player's name and prefix (e.g., "&#FFD700" for gold)
+  # Ensure this is a valid HEX color format that ChatFormatter can parse.
+  mention-hex-color: "&#DAA520" # Example: Luminous Vivid Amber
+  # If true, only add prefix/color if player is online. If false, always try to format known player names.
+  require-player-online: true

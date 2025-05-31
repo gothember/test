@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
  * Main class for the ChatPlugin.
  * Handles plugin initialization, configuration loading, command registration (reload),
  * PlaceholderAPI integration check, and management of chat features like anti-spam,
- * blocked words, and IP/link filtering.
+ * blocked words, IP/link filtering, and player mentions.
  */
 public class ChatPlugin extends JavaPlugin {
 
@@ -41,11 +41,17 @@ public class ChatPlugin extends JavaPlugin {
 
     // Configuration fields for Link/IP filter
     private boolean linkIpFilterEnabled;
-    private Pattern ipPattern;         // Compiled regex for IP detection
-    private Pattern linkPattern;       // Compiled regex for link detection (case-insensitive)
-    private List<String> allowedDomains; // Lowercase list of allowed domains for link filter
+    private Pattern ipPattern;
+    private Pattern linkPattern;
+    private List<String> allowedDomains;
     private String linkIpFilterPlayerWarning;
     private String linkIpFilterAdminNotification;
+
+    // Configuration fields for Player Mentions
+    private boolean playerMentionsEnabled;      // True if player mentions are enabled
+    private String playerMentionsPrefix;        // Prefix for mentions, e.g., "@"
+    private String playerMentionsHexColor;      // HEX color for mentioned names, e.g., "&#FFD700"
+    private boolean playerMentionsRequireOnline; // If true, only online players are highlighted
 
     private boolean placeholderApiAvailable = false;
 
@@ -76,7 +82,7 @@ public class ChatPlugin extends JavaPlugin {
 
     /**
      * Logs the current status of major configurable features to the console,
-     * including chat settings, PlaceholderAPI, anti-spam, blocked words, and link/IP filter.
+     * including chat settings, PlaceholderAPI, anti-spam, blocked words, link/IP filter, and player mentions.
      */
     private void logStatusMessages() {
         getLogger().info(String.format("Local chat radius set to: %d blocks", localChatRadius));
@@ -103,10 +109,17 @@ public class ChatPlugin extends JavaPlugin {
             if (allowedDomains != null && !allowedDomains.isEmpty()) {
                 getLogger().info(String.format("Allowed domains for link filter: %s", String.join(", ", allowedDomains)));
             } else {
-                getLogger().info("No domains explicitly allowed for link filter (all links will be blocked unless regex is very specific or filter disabled).");
+                getLogger().info("No domains explicitly allowed for link filter.");
             }
         } else {
             getLogger().info("Link/IP filter disabled.");
+        }
+        // Logging for Player Mentions
+        if (playerMentionsEnabled) {
+            getLogger().info(String.format("Player Mentions enabled. Prefix: '%s', Color: '%s', Require Online: %b",
+                             playerMentionsPrefix, playerMentionsHexColor, playerMentionsRequireOnline));
+        } else {
+            getLogger().info("Player Mentions disabled.");
         }
     }
 
@@ -117,8 +130,7 @@ public class ChatPlugin extends JavaPlugin {
 
     /**
      * Loads or reloads configuration settings from the config.yml file into the plugin's fields.
-     * This includes chat settings, anti-spam, blocked words, and the link/IP filter.
-     * Regex patterns are compiled here, and lists are processed (e.g., to lowercase).
+     * This includes chat settings, anti-spam, blocked words, link/IP filter, and player mentions.
      */
     public void loadConfigValues() {
         FileConfiguration config = getConfig();
@@ -155,13 +167,19 @@ public class ChatPlugin extends JavaPlugin {
             ipPattern = Pattern.compile("(?:[0-9]{1,3}\\.){3}[0-9]{1,3}");
             linkPattern = Pattern.compile("([a-zA-Z0-9]+(-[a-zA-Z0-9]+)*\\.)+[a-zA-Z]{2,}(:[0-9]{1,5})?(/[^ \\s]*)?", Pattern.CASE_INSENSITIVE);
             linkIpFilterEnabled = false;
-            getLogger().warning("Link/IP filter has been disabled due to invalid regex in config. Please check your regex patterns.");
+            getLogger().warning("Link/IP filter has been disabled due to invalid regex in config.");
         }
         allowedDomains = config.getStringList("link-ip-filter.allowed-domains").stream()
                                 .map(String::toLowerCase)
                                 .collect(Collectors.toList());
         linkIpFilterPlayerWarning = config.getString("link-ip-filter.player-warning-message", "&cPlease do not send links or IP addresses in chat.");
         linkIpFilterAdminNotification = config.getString("link-ip-filter.admin-notification-message", "&c[Alert] Player %player% tried to send a(n) %type%: %content%");
+
+        // Load Player Mention settings
+        playerMentionsEnabled = config.getBoolean("player-mentions.enabled", true);
+        playerMentionsPrefix = config.getString("player-mentions.mention-prefix", "@");
+        playerMentionsHexColor = config.getString("player-mentions.mention-hex-color", "&#DAA520"); // Default to a gold-like color
+        playerMentionsRequireOnline = config.getBoolean("player-mentions.require-player-online", true);
 
         placeholderApiAvailable = Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null;
     }
@@ -204,18 +222,22 @@ public class ChatPlugin extends JavaPlugin {
     public String getBlockedWordsAdminNotification() { return blockedWordsAdminNotification; }
 
     // Getters for Link/IP filter settings
-    /** @return True if the Link/IP address filter is enabled in the config. */
     public boolean isLinkIpFilterEnabled() { return linkIpFilterEnabled; }
-    /** @return Compiled regex Pattern for detecting IP addresses. */
     public Pattern getIpPattern() { return ipPattern; }
-    /** @return Compiled regex Pattern for detecting links (case-insensitive). */
     public Pattern getLinkPattern() { return linkPattern; }
-    /** @return List of lowercase domain names that are exempt from the link filter. */
     public List<String> getAllowedDomains() { return allowedDomains; }
-    /** @return The warning message for players attempting to send a link or IP address. */
     public String getLinkIpFilterPlayerWarning() { return linkIpFilterPlayerWarning; }
-    /** @return The notification message format for admins when a link or IP is detected. */
     public String getLinkIpFilterAdminNotification() { return linkIpFilterAdminNotification; }
+
+    // Getters for Player Mention settings
+    /** @return True if player mentions are enabled in the config. */
+    public boolean isPlayerMentionsEnabled() { return playerMentionsEnabled; }
+    /** @return The configured prefix string for player mentions (e.g., "@"). */
+    public String getPlayerMentionsPrefix() { return playerMentionsPrefix; }
+    /** @return The configured HEX color string for highlighting player mentions (e.g., "&#DAA520"). */
+    public String getPlayerMentionsHexColor() { return playerMentionsHexColor; }
+    /** @return True if mentioned players must be online for the mention to be formatted, false otherwise. */
+    public boolean getPlayerMentionsRequireOnline() { return playerMentionsRequireOnline; } // Corrected getter name
 
     /** @return True if PlaceholderAPI is available on the server. */
     public boolean isPlaceholderApiAvailable() { return placeholderApiAvailable; }

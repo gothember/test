@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Listener for player chat events.
@@ -24,6 +25,7 @@ import java.util.regex.Matcher;
  * - IP Address / Link filter (with bypass permission and allowed domains).
  * - Anti-spam mechanism (with bypass permission).
  * - Chat type (Global/Local) permission checks.
+ * - Player mentions (highlighting names in chat).
  * - PlaceholderAPI integration for dynamic content.
  * - Message formatting using ChatFormatter.
  */
@@ -39,8 +41,9 @@ public class ChatListener implements Listener {
 
     /**
      * Handles player chat messages at HIGH priority.
-     * ignoreCancelled = false means it respects cancellations from plugins at NORMAL or lower priorities
-     * if they also use ignoreCancelled = false. Our own filters will cancel the event if triggered.
+     * ignoreCancelled = false means it respects cancellations from plugins at NORMAL or lower priorities.
+     * Filters (blocked words, IP/link), anti-spam, and permission checks are applied before
+     * player mentions and final formatting.
      * @param event The AsyncPlayerChatEvent.
      */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = false)
@@ -49,62 +52,50 @@ public class ChatListener implements Listener {
         UUID playerId = sender.getUniqueId();
         String originalMessage = event.getMessage();
 
-        // --- Blocked Words Filter ---
-        // Checks for blocked words unless player has the "chatplugin.bypass.blockedwords" permission.
+        // --- Filters (Blocked Words, IP/Link) ---
+        // These run first. If a message is blocked, further processing is skipped.
         if (plugin.isBlockedWordsEnabled() && !sender.hasPermission("chatplugin.bypass.blockedwords")) {
-            String lowerCaseMessage = originalMessage.toLowerCase(); // For case-insensitive check
-            for (String blockedWord : plugin.getBlockedWordsList()) { // List is already lowercase
+            String lowerCaseMessage = originalMessage.toLowerCase();
+            for (String blockedWord : plugin.getBlockedWordsList()) {
                 if (lowerCaseMessage.contains(blockedWord)) {
-                    // Calls helper to cancel event, warn player, and notify staff
                     handleBlockedContent(event, sender, "blocked word", blockedWord,
                                            plugin.getBlockedWordsPlayerWarning(),
                                            plugin.getBlockedWordsAdminNotification().replace("%word%", blockedWord));
-                    return; // Message blocked, stop further processing by this listener
+                    return;
                 }
             }
         }
 
-        // --- IP/Link Detection Filter ---
-        // Detects IP addresses and links unless player has the "chatplugin.bypass.iplinkcheck" permission.
-        // This filter runs after the blocked words filter.
         if (plugin.isLinkIpFilterEnabled() && !sender.hasPermission("chatplugin.bypass.iplinkcheck")) {
-            // Check for IP addresses using the configured regex pattern
             Matcher ipMatcher = plugin.getIpPattern().matcher(originalMessage);
             if (ipMatcher.find()) {
-                String detectedIp = ipMatcher.group(0); // The matched IP address
-                // Calls helper to handle consequences
+                String detectedIp = ipMatcher.group(0);
                 handleBlockedContent(event, sender, "IP address", detectedIp,
                                        plugin.getLinkIpFilterPlayerWarning(),
                                        plugin.getLinkIpFilterAdminNotification().replace("%type%", "IP address").replace("%content%", detectedIp));
-                return; // Message blocked, stop further processing
+                return;
             }
-
-            // Check for links using the configured regex pattern (case-insensitive by default in ChatPlugin)
             Matcher linkMatcher = plugin.getLinkPattern().matcher(originalMessage);
             if (linkMatcher.find()) {
-                String detectedLink = linkMatcher.group(0); // The matched link
+                String detectedLink = linkMatcher.group(0);
                 boolean isAllowed = false;
-                // Check if the domain of the detected link is in the list of allowed domains.
-                // Allowed domains are stored in lowercase in ChatPlugin.
                 for (String allowedDomain : plugin.getAllowedDomains()) {
-                    if (detectedLink.toLowerCase().contains(allowedDomain)) { // Case-insensitive check against allowed domains
+                    if (detectedLink.toLowerCase().contains(allowedDomain)) {
                         isAllowed = true;
-                        break; // Link is allowed, no need to check further allowed domains
+                        break;
                     }
                 }
                 if (!isAllowed) {
-                    // Link is not in the allowed list, so block it.
-                    // Calls helper to handle consequences
                     handleBlockedContent(event, sender, "link", detectedLink,
                                            plugin.getLinkIpFilterPlayerWarning(),
                                            plugin.getLinkIpFilterAdminNotification().replace("%type%", "link").replace("%content%", detectedLink));
-                    return; // Message blocked, stop further processing
+                    return;
                 }
             }
         }
 
         // --- Anti-Spam Check ---
-        // Applies anti-spam rules unless player has the "chatplugin.bypass.antispam" permission.
+        // Applied if the message was not caught by previous filters.
         if (plugin.isAntiSpamEnabled() && !sender.hasPermission("chatplugin.bypass.antispam")) {
             long currentTime = System.currentTimeMillis();
             if (playerCooldowns.containsKey(playerId)) {
@@ -117,8 +108,7 @@ public class ChatListener implements Listener {
                     return;
                 } else {
                     playerCooldowns.remove(playerId);
-                    // Cooldown over message is primarily handled by the BukkitRunnable to avoid duplicates.
-                    // If desired, could send a message here if the runnable hasn't fired yet.
+                    // Cooldown over message mainly handled by BukkitRunnable to avoid duplicates.
                 }
             }
             playerMessageTimestamps.putIfAbsent(playerId, new LinkedList<>());
@@ -149,44 +139,81 @@ public class ChatListener implements Listener {
             }
         }
 
-        // --- Chat Type Permissions & Formatting ---
-        // If the message passed all filters (or bypasses were used), proceed.
-        // Cancel original event as we are handling chat formatting and sending manually.
-        event.setCancelled(true);
+        // --- Chat Type Permissions & Initial Message Content ---
+        // If we reach here, the message has passed all filters and anti-spam checks.
+        event.setCancelled(true); // We are manually handling formatting and distribution.
 
-        String messageContent;
+        String messageContent; // The actual text part of the message, after prefix removal if any.
         String chatFormat;
         boolean isGlobalChat;
         String globalPrefix = plugin.getGlobalChatPrefix();
 
-        // Determine chat type (global or local) based on prefix and check permissions.
+        // Determine chat type (global or local) and verify permissions.
         if (!globalPrefix.isEmpty() && originalMessage.startsWith(globalPrefix)) {
-            // Player intends to send a global message.
-            // Check for "chatplugin.globalchat" permission.
             if (!sender.hasPermission("chatplugin.globalchat")) {
                 sender.sendMessage(ChatColor.RED + "You do not have permission to use global chat.");
-                return; // Stop processing; player lacks permission for intended chat type.
+                return;
             }
             messageContent = originalMessage.substring(globalPrefix.length());
             chatFormat = plugin.getGlobalChatFormat();
             isGlobalChat = true;
         } else {
-            // Message is local by default.
-            // Check for "chatplugin.localchat" permission.
             if (!sender.hasPermission("chatplugin.localchat")) {
                 sender.sendMessage(ChatColor.RED + "You do not have permission to use local chat.");
-                return; // Stop processing; player lacks permission for local chat.
+                return;
             }
             messageContent = originalMessage;
             chatFormat = plugin.getLocalChatFormat();
             isGlobalChat = false;
         }
 
-        // --- Message Formatting and Distribution ---
+        // --- Player Mentions Processing ---
+        // This modifies `messageContent` to highlight mentioned player names.
+        // It runs after filters and anti-spam, on the actual content of the message.
+        if (plugin.isPlayerMentionsEnabled()) {
+            String mentionPrefix = plugin.getPlayerMentionsPrefix();
+            String mentionColor = plugin.getPlayerMentionsHexColor(); // HEX color string (e.g., "&#RRGGBB")
+            boolean requireOnline = plugin.getPlayerMentionsRequireOnline();
+
+            // Iterate through online players to find and colorize mentions.
+            // Note: If requireOnline is false, this logic would ideally check against all known player names,
+            // but Bukkit's API doesn't easily provide this. This implementation focuses on online players.
+            for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
+                String playerName = onlinePlayer.getName();
+
+                // Define the pattern for mentioning this specific player.
+                // It looks for the mention prefix followed by the player's name.
+                // Uses Pattern.quote for the prefix and player name to treat them literally in regex,
+                // and Pattern.CASE_INSENSITIVE for the player name part.
+                Pattern mentionPattern = Pattern.compile(
+                    Pattern.quote(mentionPrefix) + // Literal prefix (e.g., "@")
+                    "(" + Pattern.quote(playerName) + ")", // Capture the player's name
+                    Pattern.CASE_INSENSITIVE // Match player name case-insensitively
+                );
+                Matcher matcher = mentionPattern.matcher(messageContent);
+
+                // If a mention is found, replace it with the colored version.
+                // The ChatFormatter will later translate the HEX color string.
+                if (matcher.find()) {
+                    // group(0) is the full match (e.g., "@PlayerName")
+                    String fullMatch = matcher.group(0);
+                    // The replacement string colors the full match.
+                    String replacement = mentionColor + fullMatch;
+                    // Using replaceAll in case a player is mentioned multiple times.
+                    messageContent = matcher.replaceAll(replacement);
+                }
+            }
+        }
+
+        // --- Final Message Formatting and Distribution ---
+        // Apply base color formatting to the message content (which may now include highlighted mentions).
         String formattedContent = ChatFormatter.formatMessage(messageContent);
+
+        // Insert the processed message content into the selected chat format string.
         String prePlaceholderMessage = chatFormat.replace("%player%", sender.getName())
                                              .replace("%message%", formattedContent);
 
+        // Apply PlaceholderAPI placeholders if available.
         String postPlaceholderMessage;
         if (plugin.isPlaceholderApiAvailable()) {
             postPlaceholderMessage = PlaceholderAPI.setPlaceholders(sender, prePlaceholderMessage);
@@ -194,8 +221,10 @@ public class ChatListener implements Listener {
             postPlaceholderMessage = prePlaceholderMessage;
         }
 
+        // Final color formatting for the entire message (including format string colors and PAPI placeholders).
         String finalMessage = ChatFormatter.formatMessage(postPlaceholderMessage);
 
+        // Distribute the message globally or locally.
         if (isGlobalChat) {
             for (Player recipient : Bukkit.getOnlinePlayers()) {
                 recipient.sendMessage(finalMessage);
@@ -221,45 +250,31 @@ public class ChatListener implements Listener {
 
     /**
      * Helper method to handle actions when a message is blocked by a filter (words, IP, link).
-     * This method centralizes the logic for cancelling the event, warning the player,
-     * and notifying staff members who have the appropriate permission.
-     * @param event The AsyncPlayerChatEvent that is being processed.
-     * @param sender The player who sent the potentially offending message.
-     * @param type A string describing the type of content blocked (e.g., "blocked word", "IP address", "link").
-     * @param content The actual blocked content/text that triggered the filter.
-     * @param playerWarning The warning message to be sent to the player (already formatted or raw).
-     * @param adminNotificationFormat The format string for the notification to admins.
-     *        This string should already have specific placeholders like %word% or %type%/%content% filled by the caller.
-     *        It may still contain %player% which will be replaced here.
+     * Cancels the event, warns the player, and notifies staff.
+     * @param event The AsyncPlayerChatEvent.
+     * @param sender The player who sent the message.
+     * @param type Type of content blocked (e.g., "blocked word").
+     * @param content The actual blocked content.
+     * @param playerWarning Warning message for the player.
+     * @param adminNotificationFormat Admin notification format string (may contain %player%).
+     *        Specific placeholders like %word% or %type%/%content% should be pre-filled by the caller.
      */
     private void handleBlockedContent(AsyncPlayerChatEvent event, Player sender, String type, String content, String playerWarning, String adminNotificationFormat) {
-        event.setCancelled(true); // Stop the message from being broadcast further.
-
-        // Send the configured warning message to the player.
+        event.setCancelled(true);
         if (playerWarning != null && !playerWarning.isEmpty()) {
             sender.sendMessage(ChatFormatter.formatMessage(playerWarning));
         }
-
-        // Prepare and send the notification to staff.
         if (adminNotificationFormat != null && !adminNotificationFormat.isEmpty()) {
-            String adminNotification = adminNotificationFormat; // Base notification string
-            // Replace %player% placeholder if present. Other specific placeholders (%word%, %type%, %content%)
-            // are expected to be pre-filled by the calling filter logic.
-            if (adminNotification.contains("%player%")) {
+            String adminNotification = adminNotificationFormat;
+            if (adminNotification.contains("%player%")) { // Replace %player% if present
                  adminNotification = adminNotification.replace("%player%", sender.getName());
             }
-
-            // Ensure the final admin notification is color-formatted.
             final String finalAdminNotification = ChatFormatter.formatMessage(adminNotification);
-
-            // Send to online players who have the "chatplugin.notifyblockedword" permission.
-            // This single permission is used for all filter notifications for simplicity.
             Bukkit.getOnlinePlayers().forEach(onlinePlayer -> {
                 if (onlinePlayer.hasPermission("chatplugin.notifyblockedword")) {
                     onlinePlayer.sendMessage(finalAdminNotification);
                 }
             });
-            // Log the notification to the server console for record-keeping.
             plugin.getLogger().info(finalAdminNotification);
         }
     }
